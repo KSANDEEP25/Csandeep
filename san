@@ -1,0 +1,13 @@
+import pandas as pd
+
+
+df = pd.DataFrame({'A' : ['2016-07-01', 'impressions', 1000,],
+                   'B' : ['2016-07-01', 'impressions', 100'],
+                   'C' : ['2016-07-01', 'clicks', 20],
+                   'D' : ['2016-07-01', 'conversions', 1],
+                   'E' : ['2016-07-02', 'impressions', 2],
+                   'F' : ['2016-07-02', 'clicks', 10],
+                   'G' : ['2016-07-04', 'impressions', 10],
+                  })
+
+print df.groupby(['A', 'B','C','D','E','F','G']).sum()

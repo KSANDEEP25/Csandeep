@@ -1,0 +1,19 @@
+But as per the above requirement for Big Data where millions of records needs then we can use HIVE.
+
+Please find the details of code in HIVE for this requirement..
+
+Create a .csv file and transfer this file into LFS in Cloudera ,after that follow the below steps for given requirement output..
+
+1. Create a Table in Hive shell-
+
+create table txnrecords(Dte STRING,Type STRING,Value INT)
+row format delimited fields terminated by ',' stored as textfile;
+
+2. Load the .csv data into table txnrecords
+
+LOAD DATA INPATH '/chal.txt' OVERWRITE INTO TABLE txnrecords;
+
+3.Select the data based on our implementation is an aggregation by date including columns for each type given in the input.
+Those columns should contain the sum of values for this type and date.
+
+select dte,sum(Value) from txnrecords group by dte;

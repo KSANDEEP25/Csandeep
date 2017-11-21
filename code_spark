@@ -1,0 +1,912 @@
+
+
+Data	Engineering	Assignment Requirements Maven	3.x Java	>=	1.8	or	Scala	2.11 Task	Description You	are	given	a	multi-module	maven	project	consisting	of	two	modules,	hadoop-mr	and	spark. Additionally	you	are	given	data	files	in	csv	format	which	are	located	within	the	datasrc	folder under	the	project’s	root	directory,	each	row	contains	one	record,	separated	by	a	newline	(\n),	the fields	are	separated	by	comma	(,). c5dfa197-09b9-4606-8d8f-c4732bc2d8d7.csv consists	of	data	from	our	measurement	scripts	and	has	the	following	schema:
+00		MainDomainCode, 01		AdFormatCode, 02		AdDetectionFlag, 03		ProjectID, 04		AdCampaign, 05		AdPlacement, 06		AdCreative, 07		AdZone, 08		AdSite, 09		IframeFlag, 10		RequestDayMonthYear, 11		AdSize, 12		RequestTimestampMin, 13		RequestTimestampMax, 14		ImageWidth, 15		ImageHeight, 16		ImageArea, 17		AdAverageVisibleArea, 18		TotalAdAreaSize, 19		VisibleAdAreaSize, 20		TotalPageAreaSize, 21		VisiblePageAreaSize domain_codes.csv	contains	a	mapping	between	MainDomainCode	and	MainDomainValue:
+00	MainDomainCode	01	MainDomainValue
+(columns	from	left	to	right) Your	task	is	to	calculate	the	Average	AdSize	per	MainDomainValue,	therefore	the	two	data files	have	to	be	joined	somehow.
+You	can	choose	whether	you	want	to	write	a	Hadoop	MapReduce	Job	(using	ToolRunner)	in	Java	or implement	a	Spark	Job	in	Scala. You	do	not	need	to	have	hadoop	or	spark	installed	on	your	machine	but	Java	8	/	Scala	2.11	is required	to	be	able	to	run	the	code. For	the	hadoop-mr	task	you	can	extend net.meetrics.assignments.dataengineer.mapreduce.AbstractTool,	as	it	includes	some	basic	Logging configuration. After	running	maven	(clean	package)	you	can	excute	your	program	via
+java	-cp	target/hadoop-mr.jar	package.name.yourClass For	the	spark	task	you	can	implement	the	trait net.meetrics.assignments.dataengineer.MeetricsSparkApp,	which	already	defines	a	SparkConf	and SparkContext,	and	excute	your	programm	via
+scala	-J-Xmx1g	-cp	target/spark.jar	package.name.yourClass Results Please	hand	in	your	code	and	your	results	(and	necessary	documentation),	compressed	with	a common	compression	format	(e.g.	tar.gz).----------------------------------------
+CODE:
+
+--------------
+Welcome to
+      ____              __
+     / __/__  ___ _____/ /__
+    _\ \/ _ \/ _ `/ __/  '_/
+   /___/ .__/\_,_/_/ /_/\_\   version 2.1.0
+      /_/
+
+Using Scala version 2.11.8 (OpenJDK 64-Bit Server VM, Java 1.8.0_131)
+Type in expressions to have them evaluated.
+Type :help for more information.
+
+scala> import org.apache.spark.SparkContext
+import org.apache.spark.SparkContext
+
+scala> import org.apache.spark.SparkContext._
+import org.apache.spark.SparkContext._
+
+scala> import org.apache.spark.SparkConf
+import org.apache.spark.SparkConf
+
+scala> import org.apache.spark.sql._
+import org.apache.spark.sql._
+
+scala> val sqlc = new org.apache.spark.sql.SQLContext(sc)
+warning: there was one deprecation warning; re-run with -deprecation for details
+sqlc: org.apache.spark.sql.SQLContext = org.apache.spark.sql.SQLContext@5eff5e4c
+
+scala> val admain_csvdf1 = sqlc.read.format("com.databricks.spark.csv").option("header", "true").option("inferSchema", "true").load("/home/ubuntu/domain_codes.csv")
+admain_csvdf1: org.apache.spark.sql.DataFrame = [MainDomainCode: string, MainDomainValue: string]
+
+scala> admain_csvdf1.printSchema();
+root
+ |-- MainDomainCode: string (nullable = true)
+ |-- MainDomainValue: string (nullable = true)
+
+scala> val admain_csvdf2 = admain_csvdf1.withColumnRenamed("MainDomainCode", "MainDomainCode2")
+admain_csvdf2: org.apache.spark.sql.DataFrame = [MainDomainCode2: string, MainDomainValue: string]
+
+scala> admain_csvdf2.printSchema();
+root
+ |-- MainDomainCode2: string (nullable = true)
+ |-- MainDomainValue: string (nullable = true)
+
+
+scala> val advale_csvdf1 = sqlc.read.format("com.databricks.spark.csv").option("header", "true").option("inferSchema", "true").load("/home/ubuntu/addetailscsv.csv")
+advale_csvdf1: org.apache.spark.sql.DataFrame = [MainDomainCode: string, AdFormatCode: string ... 20 more fields]
+
+scala> advale_csvdf1.printSchema();
+root
+ |-- MainDomainCode: string (nullable = true)
+ |-- AdFormatCode: string (nullable = true)
+ |-- AdDetectionFlag: integer (nullable = true)
+ |-- ProjectID: integer (nullable = true)
+ |-- AdCampaign: decimal(6,-6) (nullable = true)
+ |-- AdPlacement: long (nullable = true)
+ |-- AdCreative: string (nullable = true)
+ |-- AdZone: integer (nullable = true)
+ |-- AdSite: integer (nullable = true)
+ |-- IframeFlag: integer (nullable = true)
+ |-- RequestDayMonthYear: string (nullable = true)
+ |-- AdSize: string (nullable = true)
+ |-- RequestTimestampMin: integer (nullable = true)
+ |-- RequestTimestampMax: integer (nullable = true)
+ |-- ImageWidth: double (nullable = true)
+ |-- ImageHeight: double (nullable = true)
+ |-- ImageArea: integer (nullable = true)
+ |-- AdAverageVisibleArea: integer (nullable = true)
+ |-- TotalAdAreaSize: long (nullable = true)
+ |-- VisibleAdAreaSize: integer (nullable = true)
+ |-- TotalPageAreaSize: long (nullable = true)
+ |-- VisiblePageAreaSize: long (nullable = true)
+
+
+scala> val admain_join = advale_csvdf1.join(admain_csvdf2,advale_csvdf1("MainDomainCode").equalTo(admain_csvdf2("MainDomainCode2")),"inner").selectExpr( "MainDomainCode","AdFormatCode", "AdDetectionFlag", "ProjectID", "AdCampaign", "AdPlacement", "AdCreative", "AdZone", "AdSite", "IframeFlag", "RequestDayMonthYear", "cast(Adsize as int) AdSize", "RequestTimestampMin", "RequestTimestampMax", "ImageWidth", "ImageHeight", "ImageArea", "AdAverageVisibleArea", "TotalAdAreaSize", "VisibleAdAreaSize", "TotalPageAreaSize", "VisiblePageAreaSize", "MainDomainValue")
+admain_join: org.apache.spark.sql.DataFrame = [MainDomainCode: string, AdFormatCode: string ... 21 more fields]
+
+scala> admain_join.printSchema();
+root
+ |-- MainDomainCode: string (nullable = true)
+ |-- AdFormatCode: string (nullable = true)
+ |-- AdDetectionFlag: integer (nullable = true)
+ |-- ProjectID: integer (nullable = true)
+ |-- AdCampaign: decimal(6,-6) (nullable = true)
+ |-- AdPlacement: long (nullable = true)
+ |-- AdCreative: string (nullable = true)
+ |-- AdZone: integer (nullable = true)
+ |-- AdSite: integer (nullable = true)
+ |-- IframeFlag: integer (nullable = true)
+ |-- RequestDayMonthYear: string (nullable = true)
+ |-- AdSize: integer (nullable = true)
+ |-- RequestTimestampMin: integer (nullable = true)
+ |-- RequestTimestampMax: integer (nullable = true)
+ |-- ImageWidth: double (nullable = true)
+ |-- ImageHeight: double (nullable = true)
+ |-- ImageArea: integer (nullable = true)
+ |-- AdAverageVisibleArea: integer (nullable = true)
+ |-- TotalAdAreaSize: long (nullable = true)
+ |-- VisibleAdAreaSize: integer (nullable = true)
+ |-- TotalPageAreaSize: long (nullable = true)
+ |-- VisiblePageAreaSize: long (nullable = true)
+ |-- MainDomainValue: string (nullable = true)
+
+
+scala> val advale_csvdf2 = advale_csvdf1.select(expr("(split(Adsize, 'x'))[0]").cast("integer").as("Adsize1"), expr("(split(Adsize, 'x'))[1]").cast("integer").as("Adsize2"),$"MainDomainCode", $"AdFormatCode", $"AdDetectionFlag", $"ProjectID", $"AdCampaign", $"AdPlacement", $"AdCreative", $"AdZone", $"AdSite", $"IframeFlag", $"RequestDayMonthYear", $"RequestTimestampMin", $"RequestTimestampMax", $"ImageWidth", $"ImageHeight", $"ImageArea", $"AdAverageVisibleArea", $"TotalAdAreaSize", $"VisibleAdAreaSize", $"TotalPageAreaSize", $"VisiblePageAreaSize")
+advale_csvdf2: org.apache.spark.sql.DataFrame = [Adsize1: int, Adsize2: int ... 21 more fields]
+
+scala> println(advale_csvdf2.show(10))
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+
+|Adsize1|Adsize2|      MainDomainCode|AdFormatCode|AdDetectionFlag|ProjectID| AdCampaign|AdPlacement|          AdCreative|    AdZone| AdSite|IframeFlag|RequestDayMonthYear|RequestTimestampMin|RequestTimestampMax|ImageWidth|ImageHeight|ImageArea|AdAverageVisibleArea|TotalAdAreaSize|VisibleAdAreaSize|TotalPageAreaSize|VisiblePageAreaSize|
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+
+|    160|    600|19552b28675bb107e...|          SS|              1|   404435|8.01319E+11|    5752901|3487286002__MEE_D...|       710|5752901|         0|         31.05.2017|         1496256517|         1496256517|     160.0|      600.0|    96000|               96000|         471520|           471520|          4990080|            1818240|
+|    160|    600|19552b28675bb107e...|        null|              3|   404435|1.37448E+11|    5752901|3487286011__MEE_D...|       710|5752901|         0|         31.05.2017|         1496267346|         1496267346|     160.0|      600.0|    96000|                   0|              0|                0|                0|                  0|
+|    800|    250|212d6307a105470c7...|        null|              3|   404435|7.98191E+11|       4509|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496267733|         1496267733|     800.0|      250.0|   200000|                   0|              0|                0|                0|                  0|
+|    300|    600|0c9403575fde5d48a...|          HP|              1|   404435|4.74467E+11| 4193463469|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496258864|         1496258864|     300.0|      600.0|   180000|              126627|        1691000|           862752|          7498752|            3993600|
+|    300|    600|91471499759b896b3...|        null|              3|   404435|1.06166E+11|    5752901|3487286017__MEE_D...|       710|5752901|         0|         31.05.2017|         1496266663|         1496266663|     300.0|      600.0|   180000|                   0|              0|                0|                0|                  0|
+|    160|    600|19552b28675bb107e...|          SS|              1|   404435|1.37448E+11|    5752901|3487286011__MEE_D...|       710|5752901|         0|         31.05.2017|         1496267161|         1496267161|     160.0|      600.0|    96000|               96000|         571000|           500600|          7440720|            1661520|
+|    800|    250|5af7d04985ccb8dba...|          BB|              1|   404435|6.91055E+11| 4193463469|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496264172|         1496264172|     800.0|      250.0|   200000|              199650|         350000|           273759|         28477248|            3010968|
+|    300|    600|906d9a644613df534...|          HP|              1|   404435| 7.3129E+10|       7811|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496265203|         1496265203|     300.0|      600.0|   180000|               50218|         635000|           297107|          6539200|            4937600|
+|    800|    250|906d9a644613df534...|          BB|              1|   404435|7.98191E+11|       7811|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496265203|         1496265203|     800.0|      250.0|   200000|              157204|         635000|           297107|          6539200|            4937600|
+|    800|    250|212d6307a105470c7...|        null|              3|   404435|7.98191E+11|       4509|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496259447|         1496259447|       1.0|        1.0|        1|                   0|         321000|           210319|         12258625|            8047940|
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+
+only showing top 10 rows
+
+()
+
+scala> val admain_join2 = advale_csvdf2.join(admain_csvdf2,advale_csvdf2("MainDomainCode").equalTo(admain_csvdf2("MainDomainCode2")),"inner").selectExpr( "cast(Adsize1 as int) AdSize1","cast(Adsize2 as int) AdSize2","MainDomainCode","AdFormatCode", "AdDetectionFlag", "ProjectID", "AdCampaign", "AdPlacement", "AdCreative", "AdZone", "AdSite", "IframeFlag", "RequestDayMonthYear", "RequestTimestampMin", "RequestTimestampMax", "ImageWidth", "ImageHeight", "ImageArea", "AdAverageVisibleArea", "TotalAdAreaSize", "VisibleAdAreaSize", "TotalPageAreaSize", "VisiblePageAreaSize", "MainDomainValue")
+admain_join2: org.apache.spark.sql.DataFrame = [AdSize1: int, AdSize2: int ... 22 more fields]
+
+scala>
+
+scala> println(admain_join2.show(10))
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+
+|AdSize1|AdSize2|      MainDomainCode|AdFormatCode|AdDetectionFlag|ProjectID| AdCampaign|AdPlacement|          AdCreative|    AdZone| AdSite|IframeFlag|RequestDayMonthYear|RequestTimestampMin|RequestTimestampMax|ImageWidth|ImageHeight|ImageArea|AdAverageVisibleArea|TotalAdAreaSize|VisibleAdAreaSize|TotalPageAreaSize|VisiblePageAreaSize|     MainDomainValue|
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+
+|    160|    600|19552b28675bb107e...|          SS|              1|   404435|8.01319E+11|    5752901|3487286002__MEE_D...|       710|5752901|         0|         31.05.2017|         1496256517|         1496256517|     160.0|      600.0|    96000|               96000|         471520|           471520|          4990080|            1818240|              cio.de|
+|    160|    600|19552b28675bb107e...|        null|              3|   404435|1.37448E+11|    5752901|3487286011__MEE_D...|       710|5752901|         0|         31.05.2017|         1496267346|         1496267346|     160.0|      600.0|    96000|                   0|              0|                0|                0|                  0|              cio.de|
+|    800|    250|212d6307a105470c7...|        null|              3|   404435|7.98191E+11|       4509|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496267733|         1496267733|     800.0|      250.0|   200000|                   0|              0|                0|                0|                  0|         t-online.de|
+|    300|    600|0c9403575fde5d48a...|          HP|              1|   404435|4.74467E+11| 4193463469|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496258864|         1496258864|     300.0|      600.0|   180000|              126627|        1691000|           862752|          7498752|            3993600|             chip.de|
+|    300|    600|91471499759b896b3...|        null|              3|   404435|1.06166E+11|    5752901|3487286017__MEE_D...|       710|5752901|         0|         31.05.2017|         1496266663|         1496266663|     300.0|      600.0|   180000|                   0|              0|                0|                0|                  0|       tecchannel.de|
+|    160|    600|19552b28675bb107e...|          SS|              1|   404435|1.37448E+11|    5752901|3487286011__MEE_D...|       710|5752901|         0|         31.05.2017|         1496267161|         1496267161|     160.0|      600.0|    96000|               96000|         571000|           500600|          7440720|            1661520|              cio.de|
+|    800|    250|5af7d04985ccb8dba...|          BB|              1|   404435|6.91055E+11| 4193463469|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496264172|         1496264172|     800.0|      250.0|   200000|              199650|         350000|           273759|         28477248|            3010968|           sport1.de|
+|    300|    600|906d9a644613df534...|          HP|              1|   404435| 7.3129E+10|       7811|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496265203|         1496265203|     300.0|      600.0|   180000|               50218|         635000|           297107|          6539200|            4937600|gewinnspiele-mark...|
+|    800|    250|906d9a644613df534...|          BB|              1|   404435|7.98191E+11|       7811|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496265203|         1496265203|     800.0|      250.0|   200000|              157204|         635000|           297107|          6539200|            4937600|gewinnspiele-mark...|
+|    800|    250|212d6307a105470c7...|        null|              3|   404435|7.98191E+11|       4509|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496259447|         1496259447|       1.0|        1.0|        1|                   0|         321000|           210319|         12258625|            8047940|         t-online.de|
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+
+only showing top 10 rows
+
+()
+
+scala> admain_join2.printSchema();
+root
+ |-- AdSize1: integer (nullable = true)
+ |-- AdSize2: integer (nullable = true)
+ |-- MainDomainCode: string (nullable = true)
+ |-- AdFormatCode: string (nullable = true)
+ |-- AdDetectionFlag: integer (nullable = true)
+ |-- ProjectID: integer (nullable = true)
+ |-- AdCampaign: decimal(6,-6) (nullable = true)
+ |-- AdPlacement: long (nullable = true)
+ |-- AdCreative: string (nullable = true)
+ |-- AdZone: integer (nullable = true)
+ |-- AdSite: integer (nullable = true)
+ |-- IframeFlag: integer (nullable = true)
+ |-- RequestDayMonthYear: string (nullable = true)
+ |-- RequestTimestampMin: integer (nullable = true)
+ |-- RequestTimestampMax: integer (nullable = true)
+ |-- ImageWidth: double (nullable = true)
+ |-- ImageHeight: double (nullable = true)
+ |-- ImageArea: integer (nullable = true)
+ |-- AdAverageVisibleArea: integer (nullable = true)
+ |-- TotalAdAreaSize: long (nullable = true)
+ |-- VisibleAdAreaSize: integer (nullable = true)
+ |-- TotalPageAreaSize: long (nullable = true)
+ |-- VisiblePageAreaSize: long (nullable = true)
+ |-- MainDomainValue: string (nullable = true)
+
+
+scala> import org.apache.spark.sql.functions.udf
+import org.apache.spark.sql.functions.udf
+
+scala> val sqlContext = new SQLContext(sc)
+warning: there was one deprecation warning; re-run with -deprecation for details
+sqlContext: org.apache.spark.sql.SQLContext = org.apache.spark.sql.SQLContext@7c2f7667
+
+scala> val resDF = admain_join2.withColumn("result", col("Adsize1") * col("Adsize2"))
+resDF: org.apache.spark.sql.DataFrame = [AdSize1: int, AdSize2: int ... 23 more fields]
+
+scala> println(resDF.show(10))
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+------+
+|AdSize1|AdSize2|      MainDomainCode|AdFormatCode|AdDetectionFlag|ProjectID| AdCampaign|AdPlacement|          AdCreative|    AdZone| AdSite|IframeFlag|RequestDayMonthYear|RequestTimestampMin|RequestTimestampMax|ImageWidth|ImageHeight|ImageArea|AdAverageVisibleArea|TotalAdAreaSize|VisibleAdAreaSize|TotalPageAreaSize|VisiblePageAreaSize|     MainDomainValue|result|
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+------+
+|    160|    600|19552b28675bb107e...|          SS|              1|   404435|8.01319E+11|    5752901|3487286002__MEE_D...|       710|5752901|         0|         31.05.2017|         1496256517|         1496256517|     160.0|      600.0|    96000|               96000|         471520|           471520|          4990080|            1818240|              cio.de| 96000|
+|    160|    600|19552b28675bb107e...|        null|              3|   404435|1.37448E+11|    5752901|3487286011__MEE_D...|       710|5752901|         0|         31.05.2017|         1496267346|         1496267346|     160.0|      600.0|    96000|                   0|              0|                0|                0|                  0|              cio.de| 96000|
+|    800|    250|212d6307a105470c7...|        null|              3|   404435|7.98191E+11|       4509|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496267733|         1496267733|     800.0|      250.0|   200000|                   0|              0|                0|                0|                  0|         t-online.de|200000|
+|    300|    600|0c9403575fde5d48a...|          HP|              1|   404435|4.74467E+11| 4193463469|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496258864|         1496258864|     300.0|      600.0|   180000|              126627|        1691000|           862752|          7498752|            3993600|             chip.de|180000|
+|    300|    600|91471499759b896b3...|        null|              3|   404435|1.06166E+11|    5752901|3487286017__MEE_D...|       710|5752901|         0|         31.05.2017|         1496266663|         1496266663|     300.0|      600.0|   180000|                   0|              0|                0|                0|                  0|       tecchannel.de|180000|
+|    160|    600|19552b28675bb107e...|          SS|              1|   404435|1.37448E+11|    5752901|3487286011__MEE_D...|       710|5752901|         0|         31.05.2017|         1496267161|         1496267161|     160.0|      600.0|    96000|               96000|         571000|           500600|          7440720|            1661520|              cio.de| 96000|
+|    800|    250|5af7d04985ccb8dba...|          BB|              1|   404435|6.91055E+11| 4193463469|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496264172|         1496264172|     800.0|      250.0|   200000|              199650|         350000|           273759|         28477248|            3010968|           sport1.de|200000|
+|    300|    600|906d9a644613df534...|          HP|              1|   404435| 7.3129E+10|       7811|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496265203|         1496265203|     300.0|      600.0|   180000|               50218|         635000|           297107|          6539200|            4937600|gewinnspiele-mark...|180000|
+|    800|    250|906d9a644613df534...|          BB|              1|   404435|7.98191E+11|       7811|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496265203|         1496265203|     800.0|      250.0|   200000|              157204|         635000|           297107|          6539200|            4937600|gewinnspiele-mark...|200000|
+|    800|    250|212d6307a105470c7...|        null|              3|   404435|7.98191E+11|       4509|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496259447|         1496259447|       1.0|        1.0|        1|                   0|         321000|           210319|         12258625|            8047940|         t-online.de|200000|
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+------+
+only showing top 10 rows
+
+()
+
+scala> val admain_join3 = resDF.withColumnRenamed("result", "Adsize")
+admain_join3: org.apache.spark.sql.DataFrame = [AdSize1: int, AdSize2: int ... 23 more fields]
+
+scala> resDF.printSchema();
+root
+ |-- AdSize1: integer (nullable = true)
+ |-- AdSize2: integer (nullable = true)
+ |-- MainDomainCode: string (nullable = true)
+ |-- AdFormatCode: string (nullable = true)
+ |-- AdDetectionFlag: integer (nullable = true)
+ |-- ProjectID: integer (nullable = true)
+ |-- AdCampaign: decimal(6,-6) (nullable = true)
+ |-- AdPlacement: long (nullable = true)
+ |-- AdCreative: string (nullable = true)
+ |-- AdZone: integer (nullable = true)
+ |-- AdSite: integer (nullable = true)
+ |-- IframeFlag: integer (nullable = true)
+ |-- RequestDayMonthYear: string (nullable = true)
+ |-- RequestTimestampMin: integer (nullable = true)
+ |-- RequestTimestampMax: integer (nullable = true)
+ |-- ImageWidth: double (nullable = true)
+ |-- ImageHeight: double (nullable = true)
+ |-- ImageArea: integer (nullable = true)
+ |-- AdAverageVisibleArea: integer (nullable = true)
+ |-- TotalAdAreaSize: long (nullable = true)
+ |-- VisibleAdAreaSize: integer (nullable = true)
+ |-- TotalPageAreaSize: long (nullable = true)
+ |-- VisiblePageAreaSize: long (nullable = true)
+ |-- MainDomainValue: string (nullable = true)
+ |-- result: integer (nullable = true)
+
+
+scala> println(resDF.show(10))
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+------+
+|AdSize1|AdSize2|      MainDomainCode|AdFormatCode|AdDetectionFlag|ProjectID| AdCampaign|AdPlacement|          AdCreative|    AdZone| AdSite|IframeFlag|RequestDayMonthYear|RequestTimestampMin|RequestTimestampMax|ImageWidth|ImageHeight|ImageArea|AdAverageVisibleArea|TotalAdAreaSize|VisibleAdAreaSize|TotalPageAreaSize|VisiblePageAreaSize|     MainDomainValue|result|
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+------+
+|    160|    600|19552b28675bb107e...|          SS|              1|   404435|8.01319E+11|    5752901|3487286002__MEE_D...|       710|5752901|         0|         31.05.2017|         1496256517|         1496256517|     160.0|      600.0|    96000|               96000|         471520|           471520|          4990080|            1818240|              cio.de| 96000|
+|    160|    600|19552b28675bb107e...|        null|              3|   404435|1.37448E+11|    5752901|3487286011__MEE_D...|       710|5752901|         0|         31.05.2017|         1496267346|         1496267346|     160.0|      600.0|    96000|                   0|              0|                0|                0|                  0|              cio.de| 96000|
+|    800|    250|212d6307a105470c7...|        null|              3|   404435|7.98191E+11|       4509|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496267733|         1496267733|     800.0|      250.0|   200000|                   0|              0|                0|                0|                  0|         t-online.de|200000|
+|    300|    600|0c9403575fde5d48a...|          HP|              1|   404435|4.74467E+11| 4193463469|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496258864|         1496258864|     300.0|      600.0|   180000|              126627|        1691000|           862752|          7498752|            3993600|             chip.de|180000|
+|    300|    600|91471499759b896b3...|        null|              3|   404435|1.06166E+11|    5752901|3487286017__MEE_D...|       710|5752901|         0|         31.05.2017|         1496266663|         1496266663|     300.0|      600.0|   180000|                   0|              0|                0|                0|                  0|       tecchannel.de|180000|
+|    160|    600|19552b28675bb107e...|          SS|              1|   404435|1.37448E+11|    5752901|3487286011__MEE_D...|       710|5752901|         0|         31.05.2017|         1496267161|         1496267161|     160.0|      600.0|    96000|               96000|         571000|           500600|          7440720|            1661520|              cio.de| 96000|
+|    800|    250|5af7d04985ccb8dba...|          BB|              1|   404435|6.91055E+11| 4193463469|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496264172|         1496264172|     800.0|      250.0|   200000|              199650|         350000|           273759|         28477248|            3010968|           sport1.de|200000|
+|    300|    600|906d9a644613df534...|          HP|              1|   404435| 7.3129E+10|       7811|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496265203|         1496265203|     300.0|      600.0|   180000|               50218|         635000|           297107|          6539200|            4937600|gewinnspiele-mark...|180000|
+|    800|    250|906d9a644613df534...|          BB|              1|   404435|7.98191E+11|       7811|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496265203|         1496265203|     800.0|      250.0|   200000|              157204|         635000|           297107|          6539200|            4937600|gewinnspiele-mark...|200000|
+|    800|    250|212d6307a105470c7...|        null|              3|   404435|7.98191E+11|       4509|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496259447|         1496259447|       1.0|        1.0|        1|                   0|         321000|           210319|         12258625|            8047940|         t-online.de|200000|
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+------+
+only showing top 10 rows
+
+()
+                                                            ^
+
+scala> resDF.printSchema();
+root
+ |-- AdSize1: integer (nullable = true)
+ |-- AdSize2: integer (nullable = true)
+ |-- MainDomainCode: string (nullable = true)
+ |-- AdFormatCode: string (nullable = true)
+ |-- AdDetectionFlag: integer (nullable = true)
+ |-- ProjectID: integer (nullable = true)
+ |-- AdCampaign: decimal(6,-6) (nullable = true)
+ |-- AdPlacement: long (nullable = true)
+ |-- AdCreative: string (nullable = true)
+ |-- AdZone: integer (nullable = true)
+ |-- AdSite: integer (nullable = true)
+ |-- IframeFlag: integer (nullable = true)
+ |-- RequestDayMonthYear: string (nullable = true)
+ |-- RequestTimestampMin: integer (nullable = true)
+ |-- RequestTimestampMax: integer (nullable = true)
+ |-- ImageWidth: double (nullable = true)
+ |-- ImageHeight: double (nullable = true)
+ |-- ImageArea: integer (nullable = true)
+ |-- AdAverageVisibleArea: integer (nullable = true)
+ |-- TotalAdAreaSize: long (nullable = true)
+ |-- VisibleAdAreaSize: integer (nullable = true)
+ |-- TotalPageAreaSize: long (nullable = true)
+ |-- VisiblePageAreaSize: long (nullable = true)
+ |-- MainDomainValue: string (nullable = true)
+ |-- result: integer (nullable = true)
+
+scala> admain_join3.printSchema();
+root
+ |-- AdSize1: integer (nullable = true)
+ |-- AdSize2: integer (nullable = true)
+ |-- MainDomainCode: string (nullable = true)
+ |-- AdFormatCode: string (nullable = true)
+ |-- AdDetectionFlag: integer (nullable = true)
+ |-- ProjectID: integer (nullable = true)
+ |-- AdCampaign: decimal(6,-6) (nullable = true)
+ |-- AdPlacement: long (nullable = true)
+ |-- AdCreative: string (nullable = true)
+ |-- AdZone: integer (nullable = true)
+ |-- AdSite: integer (nullable = true)
+ |-- IframeFlag: integer (nullable = true)
+ |-- RequestDayMonthYear: string (nullable = true)
+ |-- RequestTimestampMin: integer (nullable = true)
+ |-- RequestTimestampMax: integer (nullable = true)
+ |-- ImageWidth: double (nullable = true)
+ |-- ImageHeight: double (nullable = true)
+ |-- ImageArea: integer (nullable = true)
+ |-- AdAverageVisibleArea: integer (nullable = true)
+ |-- TotalAdAreaSize: long (nullable = true)
+ |-- VisibleAdAreaSize: integer (nullable = true)
+ |-- TotalPageAreaSize: long (nullable = true)
+ |-- VisiblePageAreaSize: long (nullable = true)
+ |-- MainDomainValue: string (nullable = true)
+ |-- Adsize: integer (nullable = true)
+
+
+scala> println(admain_join3.show(10))
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+------+
+|AdSize1|AdSize2|      MainDomainCode|AdFormatCode|AdDetectionFlag|ProjectID| AdCampaign|AdPlacement|          AdCreative|    AdZone| AdSite|IframeFlag|RequestDayMonthYear|RequestTimestampMin|RequestTimestampMax|ImageWidth|ImageHeight|ImageArea|AdAverageVisibleArea|TotalAdAreaSize|VisibleAdAreaSize|TotalPageAreaSize|VisiblePageAreaSize|     MainDomainValue|Adsize|
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+------+
+|    160|    600|19552b28675bb107e...|          SS|              1|   404435|8.01319E+11|    5752901|3487286002__MEE_D...|       710|5752901|         0|         31.05.2017|         1496256517|         1496256517|     160.0|      600.0|    96000|               96000|         471520|           471520|          4990080|            1818240|              cio.de| 96000|
+|    160|    600|19552b28675bb107e...|        null|              3|   404435|1.37448E+11|    5752901|3487286011__MEE_D...|       710|5752901|         0|         31.05.2017|         1496267346|         1496267346|     160.0|      600.0|    96000|                   0|              0|                0|                0|                  0|              cio.de| 96000|
+|    800|    250|212d6307a105470c7...|        null|              3|   404435|7.98191E+11|       4509|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496267733|         1496267733|     800.0|      250.0|   200000|                   0|              0|                0|                0|                  0|         t-online.de|200000|
+|    300|    600|0c9403575fde5d48a...|          HP|              1|   404435|4.74467E+11| 4193463469|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496258864|         1496258864|     300.0|      600.0|   180000|              126627|        1691000|           862752|          7498752|            3993600|             chip.de|180000|
+|    300|    600|91471499759b896b3...|        null|              3|   404435|1.06166E+11|    5752901|3487286017__MEE_D...|       710|5752901|         0|         31.05.2017|         1496266663|         1496266663|     300.0|      600.0|   180000|                   0|              0|                0|                0|                  0|       tecchannel.de|180000|
+|    160|    600|19552b28675bb107e...|          SS|              1|   404435|1.37448E+11|    5752901|3487286011__MEE_D...|       710|5752901|         0|         31.05.2017|         1496267161|         1496267161|     160.0|      600.0|    96000|               96000|         571000|           500600|          7440720|            1661520|              cio.de| 96000|
+|    800|    250|5af7d04985ccb8dba...|          BB|              1|   404435|6.91055E+11| 4193463469|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496264172|         1496264172|     800.0|      250.0|   200000|              199650|         350000|           273759|         28477248|            3010968|           sport1.de|200000|
+|    300|    600|906d9a644613df534...|          HP|              1|   404435| 7.3129E+10|       7811|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496265203|         1496265203|     300.0|      600.0|   180000|               50218|         635000|           297107|          6539200|            4937600|gewinnspiele-mark...|180000|
+|    800|    250|906d9a644613df534...|          BB|              1|   404435|7.98191E+11|       7811|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496265203|         1496265203|     800.0|      250.0|   200000|              157204|         635000|           297107|          6539200|            4937600|gewinnspiele-mark...|200000|
+|    800|    250|212d6307a105470c7...|        null|              3|   404435|7.98191E+11|       4509|_CK-StoreOpening-...|1295506763|   null|         0|         31.05.2017|         1496259447|         1496259447|       1.0|        1.0|        1|                   0|         321000|           210319|         12258625|            8047940|         t-online.de|200000|
++-------+-------+--------------------+------------+---------------+---------+-----------+-----------+--------------------+----------+-------+----------+-------------------+-------------------+-------------------+----------+-----------+---------+--------------------+---------------+-----------------+-----------------+-------------------+--------------------+------+
+only showing top 10 rows
+
+()
+
+scala> import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.RDD
+
+scala> import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.SQLContext
+
+scala> import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.{SparkConf, SparkContext}
+
+scala> import org.joda.time.format.DateTimeFormat
+import org.joda.time.format.DateTimeFormat
+
+scala> import org.apache.spark.sql.functions._
+import org.apache.spark.sql.functions._
+
+scala> val res = admain_join3.groupBy("MainDomainValue").agg(avg("Adsize")
+     | )
+res: org.apache.spark.sql.DataFrame = [MainDomainValue: string, avg(Adsize): double]
+
+scala> println(res.show(10))
++--------------------+------------------+
+|     MainDomainValue|       avg(Adsize)|
++--------------------+------------------+
+| patientenfragen.net|           85500.0|
+|norddeutschland-u...|          180000.0|
+|mondkalender-onli...|           80760.0|
+|         meinchat.de|           96000.0|
+|      spielesite.com| 193297.2972972973|
+|            noizz.de|100869.09090909091|
+|        hz-online.de|          180000.0|
+|        e46-forum.de|           75680.0|
+|     worldsoffood.de|           65520.0|
+|  businessinsider.de|          126065.0|
++--------------------+------------------+
+only showing top 10 rows
+
+()
+
+scala> res.count()
+res25: Long = 520
+
+scala> println(res.show(520))
++--------------------+------------------+
+|     MainDomainValue|       avg(Adsize)|
++--------------------+------------------+
+| patientenfragen.net|           85500.0|
+|norddeutschland-u...|          180000.0|
+|mondkalender-onli...|           80760.0|
+|         meinchat.de|           96000.0|
+|      spielesite.com| 193297.2972972973|
+|            noizz.de|100869.09090909091|
+|        hz-online.de|          180000.0|
+|        e46-forum.de|           75680.0|
+|     worldsoffood.de|           65520.0|
+|  businessinsider.de|          126065.0|
+|             sixx.de|           82000.0|
+|    meinflirtchat.de|           96000.0|
+|marbacher-zeitung.de|          127840.0|
+|     weser-kurier.de|          130380.0|
+|     mittelhessen.de|          141840.0|
+|       autoplenum.de|           75000.0|
+|       tecchannel.de|102369.02777777778|
+|        webaslan.com|           96000.0|
+|        triathlon.de|           96000.0|
+|      echo-online.de|          180000.0|
+|               wn.de|          141840.0|
+|          wetter.com| 79374.48818897638|
+|        radio-vhr.de|           80760.0|
+|        lr-online.de|           96000.0|
+|        iatacodes.de|           65520.0|
+|       epochtimes.de|178112.35955056178|
+|        winnegirl.de|           96000.0|
+|rhoenundsaalepost.de|          180000.0|
+|            urbia.de|132367.27272727274|
+|        sn-online.de|          180000.0|
+|   lahrer-zeitung.de|          180000.0|
+|           sporx.com|           96000.0|
+|          724auto.de|          134208.0|
+|          anitalk.de|           80760.0|
+|            play3.de|           65520.0|
+|             fem.com|          182500.0|
+|abendzeitung-muen...|172911.42857142858|
+|          familie.de| 96189.09090909091|
+|         brigitte.de|154431.42857142858|
+|        mypolonia.de|           80760.0|
+|allgemeine-zeitun...|          180000.0|
+| mittelbayerische.de|           65520.0|
+|      happy-spots.de|          200000.0|
+|         westline.de|          195200.0|
+|          haz-job.de|          113840.0|
+|          lustich.de|           65520.0|
+|           localhost|           16000.0|
+|              jam.fm|          180000.0|
+|         gamestar.de|112669.33333333333|
+|deutsch-tuerkisch...|          180000.0|
+|       pennergame.de|120506.66666666667|
+|       nordkurier.de|           80760.0|
+|      nachrichten.de|          200000.0|
+|          bbheute.de|          155190.0|
+|        rp-online.de|          130380.0|
+|            radio.de|          154320.0|
+|           lz-job.de|          180000.0|
+|wirtschaft-region...|          152000.0|
+|          unser38.de|          180000.0|
+|          sz-jobs.de|          180000.0|
+|              moz.de|          180000.0|
+|  mittelstandcafe.de|          200000.0|
+|        goodnews4.de|          180000.0|
+|        tikonline.de|          195000.0|
+|        prosieben.de| 131475.7894736842|
+|  scienceticker.info|          200000.0|
+|         antenne1.de|          134208.0|
+|      kraichgau.news|123291.42857142857|
+|           jameda.de|           68680.0|
+|       geldsparen.de|          113840.0|
+|        fitforfun.de|          117000.0|
+|      donaukurier.de|          122760.0|
+|              ndz.de|          180000.0|
+|       morgenpost.de|          180000.0|
+|          mazjobs.de|          180000.0|
+|    hurriyetaile.com|           65520.0|
+|   gewinde-normen.de|           96000.0|
+|   browsergames.info|          180000.0|
+|            bigfm.de|          141840.0|
+|        posta.com.tr|           96000.0|
+|      octavia-rs.com|          200000.0|
+|        infranken.de|          180000.0|
+|       regio-news.de|          122760.0|
+|     livingathome.de|          145000.0|
+|          funfire.de|           65520.0|
+|         dreamies.de| 182659.0099009901|
+|     serienzitate.de|           96000.0|
+|     schwaebische.de|123173.33333333333|
+|         clipfish.de|136764.70588235295|
+|torgranate-rhein-...|           96000.0|
+|         sat1gold.de|           82000.0|
+|             gala.de|136268.23529411765|
+|  vitamindmangel.net|           75000.0|
+|          tellows.de|           65520.0|
+|ruesselsheimer-ec...|          180000.0|
+|      rockantenne.de|          141840.0|
+|             tvtv.de|           99140.0|
+|           sport1.de|100621.81818181818|
+|dattelner-morgenp...|          180000.0|
+|        4fansites.de|          180000.0|
+|   taunus-zeitung.de|          122760.0|
+|              lkz.de|          127840.0|
+|         htaccess.it|          180000.0|
+| addicted-sports.com|          200000.0|
+|      frankenpost.de|          141840.0|
+|              dnn.de|          180000.0|
+|                null|103509.56521739131|
+|googleadservices.com| 84421.93548387097|
+|           wize.life|113506.66666666667|
+|         superfb.com|          180000.0|
+|       radiokoeln.de|          180000.0|
+|       filmzitate.de|           80760.0|
+|      fanatik.com.tr|           96000.0|
+|marktspiegel-verl...|          180000.0|
+|     grand-canyon.de|          200000.0|
+|         lifeline.de|          114380.0|
+|           news38.de|          180000.0|
+|               fr.de|          113840.0|
+|          netmoms.de|           92500.0|
+|verlagshaus-jauma...|          151380.0|
+|            stern.de|          142744.0|
+|     frauenzimmer.de|          127500.0|
+|        dragosien.de|          200000.0|
+|      aktiencheck.de|          153536.0|
+|          playboy.de|138453.33333333334|
+|              nnp.de|          103680.0|
+|       meinestadt.de| 77815.38461538461|
+|    flaggenbilder.de|          200000.0|
+|             welt.de|          126536.0|
+|    raetsel-hilfe.de|           75680.0|
+|        pcmasters.de|           96000.0|
+|     medizin-netz.de|           96000.0|
+|       goslarsche.de|          180000.0|
+|          psychic.de| 75582.85714285714|
+|kornwestheimer-ze...|          113840.0|
+|     holidaycheck.de|           76932.0|
+|           xmaker.de|189142.85714285713|
+|wie-sagt-man-noch.de|           65520.0|
+|              pnp.de|          122760.0|
+|         immowelt.de|          141840.0|
+|     hurriyet.com.tr|           80760.0|
+|augsburger-allgem...|          154428.0|
+|    anime-junkies.tv|           75000.0|
+|         vorname.com|          165104.0|
+|             chip.de|138193.84615384616|
+|      insidegames.ch|           65520.0|
+|        bz-ticket.de|          130380.0|
+|buerstaedter-zeit...|          180000.0|
+|         alopezie.de|           75000.0|
+|         webradio.de|           65520.0|
+|    spruechetante.de|           80760.0|
+|googlesyndication...|          184000.0|
+|              rtv.de|           70260.0|
+|               nw.de|          130380.0|
+|            fupa.net|186080.99378881988|
+|           str8ts.de|           85840.0|
+|         neuwagen.de|147291.42857142858|
+|         t-online.de| 199101.4492753623|
+|wiesbadener-kurie...|          180000.0|
+|       suedkurier.de|          116070.0|
+|      vorschauxxl.de|           83130.0|
+|         unixtime.de|           65520.0|
+|        5.159.57.179|          200000.0|
+|        preisboss.de|183251.42857142858|
+|              vip.de|135290.52631578947|
+|        np-coburg.de|          141840.0|
+|          hamburg.de|          125130.0|
+|       forumprofi.de|           65520.0|
+|             dict.cc|           73140.0|
+|guertelrose-infek...|           65520.0|
+| businesspress24.com|          200000.0|
+|    inselcompany3.de|           80760.0|
+|      planet3dnow.de|           65520.0|
+|hertener-allgemei...|          180000.0|
+|          comunio.de|134046.15384615384|
+|        stylebook.de|          127304.0|
+|           stimme.de|          164121.6|
+|     hausarbeiten.de|           96000.0|
+|         wetter.info|           96000.0|
+|reutlinger-wochen...|          180000.0|
+|              ran.de|           76152.0|
+|gmuender-tagespos...| 139645.7142857143|
+|        finanzen.net|106908.88888888889|
+|    clipart-kiste.de|          200000.0|
+|       androidmag.de|           75000.0|
+|        tvdigital.de|          200000.0|
+|     tuningracers.de|           65520.0|
+|ag-mad-dev-fronte...|          180000.0|
+|             wiwo.de| 86666.66666666667|
+|              geo.de|          180000.0|
+|die-mehrwertsteue...|           96000.0|
+|             zeit.de|113213.84615384616|
+| usinger-anzeiger.de|          180000.0|
+|   ostsee-zeitung.de|          180000.0|
+|       op-marburg.de|          180000.0|
+|nullfuenfmixedzon...|          200000.0|
+|        morgenweb.de|          180000.0|
+|giessener-anzeige...|          180000.0|
+|      zvg-online.net|          180000.0|
+|     radio-siegen.de|          180000.0|
+|       moviepilot.de|          124500.0|
+|            itiko.de|          190000.0|
+|       speedweek.com|           72630.0|
+|       quizaction.de|           96000.0|
+|      eu-neuwagen.de|           80760.0|
+|      perfonspot.com|          190000.0|
+|    handelsblatt.com|           98500.0|
+|       allgaeuhit.de|           96000.0|
+|         gaeubote.de|          113840.0|
+|             rtl2.de|          153750.0|
+|            l-mag.de|          180000.0|
+|        gigrawars.de|           75680.0|
+|       sporttotal.tv|104753.33333333333|
+|              noz.de|          180000.0|
+|     gazetevatan.com|           80760.0|
+|              fnp.de|106937.14285714286|
+|    brieffreunde.org|          200000.0|
+|    wieistmeineip.de| 148074.2857142857|
+|stadtfeste-in-deu...|          180000.0|
+|             bild.de|          200000.0|
+|beautynails-forum.de|           65520.0|
+|gewinnspiele-mark...|197894.73684210525|
+|      volksstimme.de|          180000.0|
+|          schnapp.de|          130380.0|
+|          pixelio.de|          200000.0|
+|         myzitate.de|           96000.0|
+|         chefkoch.de|147864.44444444444|
+|           stimmt.de|          180000.0|
+|schwaebische-post.de|167718.26086956522|
+|           runen.net|           65520.0|
+|               ok.de|           80760.0|
+|schwangerschaftsz...|           75000.0|
+|mad-prd-frontend....|          180000.0|
+|            golem.de| 91738.82352941176|
+|thrombozyten-info.de|           70260.0|
+|          immosbb.de|          180000.0|
+|              zvw.de|          113840.0|
+|        yp-berlin.de| 82453.33333333333|
+|              tlz.de|          152000.0|
+|        pkw-tarif.de|          152000.0|
+|       bildspielt.de|120506.66666666667|
+|          pz-news.de|123291.42857142857|
+|     milliyet.com.tr|           80760.0|
+|maschinenbau-wiss...|           80760.0|
+|      freiepresse.de|          180000.0|
+|     doubleclick.net| 74814.11764705883|
+|       mogelpower.de| 76506.66666666667|
+|       maz-online.de|          131904.0|
+|       bolly-wood.de|          200000.0|
+|schneidern-naehen.de|           65520.0|
+|denksport-raetsel.de|           96000.0|
+|     thueringen24.de|          101760.0|
+|stuttgarter-zeitu...|123291.42857142857|
+|wolfenbuetteler-z...|          113840.0|
+|              rtl.de|          133123.2|
+|              lvz.de|          146920.0|
+|    clever-tanken.de|          106760.0|
+|     wunderkessel.de|           80760.0|
+|    transfermarkt.de|106652.63157894737|
+|        promipool.de| 89697.77777777778|
+|              otz.de|          119880.0|
+|               mt.de|          180000.0|
+|landespresseporta...|           65520.0|
+|general-anzeiger-...|          122760.0|
+|      deluxemusic.tv|           96000.0|
+|      cafe-lingua.de|           80760.0|
+|    724gesundheit.de|          180000.0|
+|       regenbogen.de|          151380.0|
+|         maedchen.de|          101510.0|
+|lampertheimer-zei...|          180000.0|
+|      juliensblog.tv|          180000.0|
+|    der-berg-ruft.de|          180000.0|
+|            amica.de|          144304.0|
+|            pons.com|148391.11111111112|
+|essen-und-trinken.de|133448.88888888888|
+|weihnachtsmaerkte...|          156380.0|
+|             etcg.de|           65520.0|
+|bergedorfer-zeitu...|          180000.0|
+|      sportbuzzer.de|          180000.0|
+|       songtexte.com| 93138.18181818182|
+|rheinische-anzeig...|          180000.0|
+|nordbayerischer-k...|          141840.0|
+|         ja-pics.net|           96000.0|
+|            sims4.eu|          200000.0|
+|          peketec.de|           65520.0|
+|          kununu.com|           82000.0|
+|            jolie.de|           75408.0|
+|goettinger-tagebl...|          180000.0|
+|   aktuelle-news.com|177586.66666666666|
+|     lokalkompass.de|          141840.0|
+|         fachwerk.de|           96000.0|
+|          mmo-spy.de|           77712.0|
+|         kiezking.de|           96000.0|
+|             idg.ipx|           85500.0|
+|   die-besten-100.de|           65520.0|
+|          antenne.de|          134208.0|
+|           wetter.de|          130410.0|
+|        sabah.com.tr|           96000.0|
+|       comicforum.de|           65520.0|
+|       crossdrone.de|180208.78048780488|
+|        flohmarkt.ms|          180000.0|
+|      heimatsport.de|          180000.0|
+| cashinonbanners.com|          200000.0|
+|        bullybase.de|          180000.0|
+|      top10berlin.de|          180000.0|
+|     sueddeutsche.de|118932.41379310345|
+|           nw-job.de|          180000.0|
+|             n-tv.de|140469.67741935485|
+|            jetzt.de|101253.33333333333|
+|hassfurter-tagbla...|          180000.0|
+|     gesuendernet.de|           75000.0|
+|  ruhrnachrichten.de|          100608.0|
+|         rnd-live.de|          180000.0|
+|    regioerlebnis.de|           65520.0|
+|        radioerft.de|          180000.0|
+|doppelpass-online.de|           96000.0|
+|     computerbild.de|          200000.0|
+|  westfalen-blatt.de|          103680.0|
+|        apfeltalk.de|           65520.0|
+|      touchportal.de|           75000.0|
+|        nwzonline.de|          180000.0|
+|  manager-magazin.de|           86010.0|
+|        kabeleins.de|           85500.0|
+|       ovb-online.de|           65520.0|
+|        huffpost.com|           75000.0|
+|         ekitchen.de|          200000.0|
+|schwarzwaelder-bo...|134196.92307692306|
+|    prosiebenmaxx.de|           75000.0|
+|trennungsschmerze...|           79608.0|
+|zimmerpflanzen-fa...|           65520.0|
+|            focus.de| 143374.9019607843|
+|        724trucks.de|          180000.0|
+|       stargames.com|          200000.0|
+|     dailymail.co.uk|           75680.0|
+|               wz.de|          180000.0|
+|              ntz.de|          116070.0|
+|         wiponews.de|           80760.0|
+|  techniker-forum.de|           75000.0|
+|           mt-job.de|          180000.0|
+|              haz.de|          146920.0|
+|         sr-nexus.de|           65520.0|
+|           madame.de| 96148.57142857143|
+|        kn-online.de|          151380.0|
+|   business-punk.com|           75000.0|
+|    wer-weiss-was.de|          200000.0|
+|       waz-online.de|          180000.0|
+|     firmenpresse.de|          195000.0|
+| torgauerzeitung.com|          122760.0|
+|        sz-online.de|          130380.0|
+|        phonostar.de|          180000.0|
+|          kochbar.de|          158875.0|
+|volksfeste-in-deu...|          180000.0|
+|kotzendes-einhorn.de|          180000.0|
+|         obermain.de|          180000.0|
+|         mein-mmo.de|           75000.0|
+|          lachts.net|          190000.0|
+|     dance-charts.de|          127840.0|
+|   sprueche-suche.de|           65520.0|
+|motorsport-total.com|           77260.0|
+|       eatsmarter.de|          100000.0|
+|       travelbook.de|155173.33333333334|
+|       playnation.de|          119304.0|
+|        medizinfo.de|           96000.0|
+|          formel1.de|107671.11111111111|
+|       burdastyle.de|          190000.0|
+|     zeckenstich.net|           78840.0|
+|         weather.com|          180000.0|
+|salzgitter-zeitun...|          180000.0|
+|         zvw-immo.de|          180000.0|
+|         xxlscore.de|           96000.0|
+|        outspoken.de|           65520.0|
+|         mainpost.de|          130380.0|
+|          gamepro.de|           77304.0|
+|       dr-gumpert.de|           80420.0|
+|        crossmoto.de|182869.50819672132|
+|    saw-musikwelt.de|           65520.0|
+|         freggers.de|           65520.0|
+|      finanzen100.de|          145000.0|
+|          burn-fm.de|          180000.0|
+|arbeitslosengeld-...|           80760.0|
+|             szlz.de|          130380.0|
+|            mydoc.de|           65520.0|
+|    heimatzeitung.de|          180000.0|
+| aachener-zeitung.de|          180000.0|
+|          tvtoday.de|          118356.0|
+|  elektronik-star.de|          200000.0|
+|    computerwoche.de|106225.83541147131|
+|      volksfreund.de|          151380.0|
+|         cineclub.de|          200000.0|
+|        bz-berlin.de|           65520.0|
+|pflanzenbestimmun...|           80760.0|
+|ostern-in-deutsch...|          200000.0|
+|           kaufda.de|          122000.0|
+|   fitness-kueche.de|           80760.0|
+|deutsche-rechtsch...|          190000.0|
+|    eishockeynews.de|196363.63636363635|
+|        pietsmiet.de|           75000.0|
+|        anime2you.de|           70260.0|
+|       teleboerse.de|          121065.0|
+|         lexpark.biz|          200000.0|
+|       wow-forum.com|           65520.0|
+|       speedtreff.de|           65520.0|
+| badische-zeitung.de|135291.42857142858|
+|           hoerzu.de| 99673.33333333333|
+|        chat4free.de|           80760.0|
+|      wort-suchen.de| 79893.33333333333|
+|leonberger-kreisz...|          105570.0|
+|         wintotal.de|          200000.0|
+|     splashcomics.de|           80760.0|
+|     radiohamburg.de|          180000.0|
+|      nonstopnews.de|          130380.0|
+|        hockeyweb.de|          180000.0|
+|     soccerscout.net|193333.33333333334|
+|        nq-online.de|          180000.0|
+|               ze.tt|           75000.0|
+|   traumhochzeit.com|          180000.0|
+|          madsack.de|          180000.0|
+|      soapspoiler.de|           78840.0|
+|        123recht.net|           65520.0|
+|      stock-world.de|          167595.0|
+|          maclife.de|           70260.0|
+|         chat2000.de|           96000.0|
+|               lz.de|           80760.0|
+|        areagames.de|           70260.0|
+|          spiegel.de|102368.84210526316|
+|thueringer-allgem...|123291.42857142857|
+|         archive.org|          180000.0|
+|antennethueringen.de|          180000.0|
+|    markus-agerer.de|           65520.0|
+|       areamobile.de|          112940.0|
+|         rtlnitro.de|          127500.0|
+|      reviersport.de|          180000.0|
+|       fitrechner.de|           78840.0|
+|      sammelkatze.de|          200000.0|
+|       nordbayern.de|          159000.0|
+|              mp3.de|           96000.0|
+|            krzbb.de|          140304.0|
+|          kn-jobs.de|          180000.0|
+|       filmstarts.de| 152811.0344827586|
+|   scharlach-info.de|           96000.0|
+|         21-jump.com|          200000.0|
+|            sport.de|          108000.0|
+|quizshow-training...|158666.66666666666|
+|     planetsocial.de|           65520.0|
+|       neuepresse.de|          151380.0|
+|             wsim.de|           65520.0|
+|  stellenanzeigen.de|          113840.0|
+|         spektrum.de|116714.28571428571|
+|  schoener-wohnen.de|          127500.0|
+|             news.de|          113840.0|
+|        f30-forum.de|           65520.0|
+|digital-eliteboar...|           65520.0|
+|             spin.de|165333.33333333334|
+|            salue.de|          130380.0|
+|    reimemaschine.de|           73512.0|
+|     pferdeforum.com|          200000.0|
+|          adscale.de| 141005.7142857143|
+|              vox.de|124636.36363636363|
+|             rpr1.de|          138000.0|
+|             faz.net|           98104.0|
+| autogasvergleich.de|          122760.0|
+|          galileo.tv|          153750.0|
+|     bmi-rechner.net|           65520.0|
+|     web4health.info|          178190.0|
+|           cinema.de|158666.66666666666|
+|      karakartal.com|           96000.0|
+|         kinonews.de|191612.90322580645|
+|technisches-zeich...|           65520.0|
+|    schwertkriege.de|           65520.0|
+|       visuscreen.de|          180000.0|
+|stuttgarter-nachr...|          127840.0|
+|   fussball-in-bw.de|          151380.0|
+|           eltern.de|          130130.0|
+|              cio.de| 91950.58823529411|
+|braunschweiger-ze...|          122760.0|
+|       rautemusik.fm|          180000.0|
+|       goldseiten.de|           96000.0|
+|        e90-forum.de|           80760.0|
+|      bigkarriere.de|          180000.0|
+| insuedthueringen.de|          180000.0|
+|   triff-chemnitz.de|           80760.0|
+|        shortnews.de| 171943.5294117647|
+|            prinz.de|           96000.0|
+|      partyzettel.de|184138.18181818182|
+|       abendblatt.de|          103680.0|
+|  schimmel-hilfe.com|           80760.0|
+|        consolero.de|          172845.0|
+|          9monate.de|           88380.0|
+|   virtualnights.com|          180000.0|
+|      tvspielfilm.de|         135611.25|
+|      rsa-sachsen.de|          180000.0|
+|    onlinewelten.com|           65520.0|
+|        f10-forum.de|           80760.0|
+|       rheinpfalz.de|          134208.0|
+|            ariva.de|104766.95652173914|
+|       qualimedic.de|           96000.0|
+|            idowa.de|          130380.0|
+|          blinker.de|           70260.0|
+|        11freunde.de|          132500.0|
+|             sat1.de|           81504.0|
+|           pafnet.de|          180000.0|
+| sms-verschicken.com|          200000.0|
+|         windinfo.eu|           65520.0|
+|wiesbadener-tagbl...|          180000.0|
+|        testedich.de|          107380.0|
+|        ln-online.de|          180000.0|
+|              swp.de|134196.92307692306|
+|         radiosaw.de|          180000.0|
+|           fudder.de|          113840.0|
+|   1kdailyprofit.biz|          200000.0|
+|      harzfriends.de|177586.66666666666|
+|   huffingtonpost.de|143298.18181818182|
+|  wormser-zeitung.de|          180000.0|
+|           dokus4.me|165333.33333333334|
+|     planet-liebe.de|          180000.0|
+|           immo38.de|           65520.0|
+|          femineo.de| 79066.66666666667|
+|      die-goetter.de|          183190.0|
+|       viralshare.de|           65520.0|
+|         autobild.de|          200000.0|
++--------------------+------------------+
